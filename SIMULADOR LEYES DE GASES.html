@@ -1,0 +1,1319 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#0f172a">
+<title>GasLab Móvil v4.0 — Animación molecular realista</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  :root {
+    --bg: #0f172a; --card: #1e293b; --accent: #38bdf8;
+    --accent2: #f472b6; --text: #e2e8f0; --muted: #94a3b8;
+    --ok: #22c55e; --warn: #f59e0b; --lock: #64748b;
+  }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: linear-gradient(160deg, #0f172a 0%, #1e1b4b 100%);
+    background-attachment: fixed; color: var(--text);
+    min-height: 100vh; padding: 12px; padding-bottom: 90px;
+  }
+  header { text-align: center; margin-bottom: 12px; }
+  header h1 {
+    font-size: 1.3rem; margin: 0;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  }
+  header p { color: var(--muted); font-size: .75rem; margin: 4px 0 0; }
+
+  .tabs { display: flex; overflow-x: auto; gap: 8px; padding: 4px 0 10px; scrollbar-width: none; }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tab {
+    flex: 0 0 auto; padding: 8px 14px; background: var(--card);
+    border: 1px solid #334155; border-radius: 999px; color: var(--muted);
+    font-size: .78rem; font-weight: 600; white-space: nowrap; cursor: pointer; transition: all .2s;
+  }
+  .tab.active {
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    color: #0f172a; border-color: transparent;
+  }
+  .card {
+    background: var(--card); border-radius: 18px; padding: 14px;
+    box-shadow: 0 8px 24px rgba(0,0,0,.35); margin-bottom: 12px;
+  }
+  .card h2 { font-size: 1rem; margin: 0 0 6px; color: var(--accent); }
+  .formula {
+    font-family: "Courier New", monospace; background: #0f172a;
+    padding: 8px 12px; border-radius: 10px; color: var(--accent2);
+    font-size: .88rem; text-align: center; margin: 6px 0 12px;
+    border: 1px solid #334155; overflow-x: auto; white-space: nowrap;
+  }
+  .selector { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+  .selector button {
+    flex: 1; min-width: 85px; padding: 8px 6px;
+    border: 1px solid #334155; border-radius: 10px;
+    background: #0f172a; color: var(--muted);
+    font-weight: 600; font-size: .72rem; cursor: pointer; transition: all .2s;
+  }
+  .selector button.active {
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    color: #0f172a; border-color: transparent;
+  }
+
+  .modo-lab {
+    display: flex; align-items: center; justify-content: space-between;
+    background: #0f172a; border: 1px solid #334155;
+    border-radius: 12px; padding: 8px 12px; margin-bottom: 12px;
+    font-size: .78rem;
+  }
+  .modo-lab .label { color: var(--muted); }
+  .modo-lab .switch {
+    position: relative; width: 44px; height: 24px;
+    background: #334155; border-radius: 999px;
+    cursor: pointer; transition: background .3s; flex-shrink: 0;
+  }
+  .modo-lab .switch::after {
+    content: ''; position: absolute; top: 2px; left: 2px;
+    width: 20px; height: 20px; background: #94a3b8;
+    border-radius: 50%; transition: all .3s;
+  }
+  .modo-lab .switch.on { background: var(--warn); }
+  .modo-lab .switch.on::after { left: 22px; background: #fff; }
+  .aviso-lab {
+    background: rgba(245,158,11,.15);
+    border: 1px solid var(--warn);
+    border-radius: 10px; padding: 8px 10px;
+    font-size: .74rem; color: #fbbf24;
+    margin-bottom: 12px; line-height: 1.4;
+  }
+
+  .field { margin-bottom: 10px; padding: 6px 8px; border-radius: 8px; }
+  .field label {
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: .8rem; color: var(--muted); margin-bottom: 5px;
+  }
+  .field label span.value { color: var(--accent); font-weight: 700; }
+  .field.incognita {
+    background: rgba(34,197,94,.08);
+    border-left: 3px solid var(--ok);
+  }
+  .field.incognita label { color: var(--ok); }
+  .field.incognita label span.value { color: var(--ok); font-size: 1rem; }
+  .field.incognita input[type=range] { display: none; }
+  .field.bloqueada {
+    background: rgba(100,116,139,.1);
+    border-left: 3px solid var(--lock); opacity: .85;
+  }
+  .field.bloqueada label { color: var(--lock); }
+  .field.bloqueada label span.value { color: var(--lock); }
+  input[type=range] {
+    width: 100%; -webkit-appearance: none; height: 6px;
+    border-radius: 3px; background: #334155; outline: none;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 22px; height: 22px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    cursor: pointer; box-shadow: 0 0 8px rgba(56,189,248,.7);
+  }
+  input[type=range]::-moz-range-thumb {
+    width: 22px; height: 22px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border: none; cursor: pointer;
+  }
+  input[type=range]:disabled { opacity: .4; }
+  input[type=range]:disabled::-webkit-slider-thumb {
+    background: #64748b; box-shadow: none;
+  }
+
+  .result {
+    background: #0f172a; border-radius: 12px; padding: 12px;
+    text-align: center; border: 1px solid var(--ok); margin-top: 6px;
+  }
+  .result .label { color: var(--muted); font-size: .78rem; }
+  .result .value { font-size: 1.8rem; font-weight: 800; color: var(--ok); margin-top: 2px; }
+  .result .unit { font-size: .85rem; color: var(--muted); }
+
+  .chart-wrap { position: relative; height: 200px; margin-top: 8px; }
+
+  /* ===== CANVAS MOLECULAR ===== */
+  .mol-wrap {
+    position: relative;
+    background: #0f172a;
+    border-radius: 12px;
+    overflow: hidden;
+    margin-top: 8px;
+  }
+  canvas.mol { width: 100%; height: 240px; display: block; }
+  .mol-overlay {
+    position: absolute; top: 8px; left: 8px;
+    font-size: .7rem; color: #e2e8f0;
+    font-family: "Courier New", monospace;
+    line-height: 1.5;
+    text-shadow: 0 0 4px rgba(0,0,0,.8);
+    pointer-events: none;
+  }
+  .mol-overlay .k { color: var(--accent); font-weight: 700; }
+  .mol-overlay .v { color: #fff; font-weight: 700; }
+  .mol-overlay .p { color: var(--ok); font-weight: 700; }
+  .mol-overlay .m { color: var(--accent2); font-weight: 700; }
+
+  .info { font-size: .78rem; color: var(--muted); line-height: 1.5; margin-top: 8px; }
+  .badge {
+    display: inline-block; padding: 2px 8px; border-radius: 999px;
+    background: #1e3a8a; color: #93c5fd; font-size: .68rem; margin-left: 6px;
+  }
+  .badge.lock { background: #475569; color: #cbd5e1; }
+
+  .ejemplos { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+  .ejemplos button {
+    padding: 6px 10px; font-size: .74rem; border-radius: 8px;
+    background: #0f172a; color: var(--muted);
+    border: 1px solid #334155; cursor: pointer; transition: all .2s;
+  }
+  .ejemplos button:hover, .ejemplos button.active {
+    color: var(--accent); border-color: var(--accent);
+  }
+  .ejemplo-detalle {
+    background: #0f172a; border-radius: 12px; padding: 12px;
+    margin-top: 10px; border: 1px solid #334155;
+    font-size: .82rem; line-height: 1.6;
+  }
+  .ejemplo-detalle h3 { font-size: .95rem; color: var(--accent); margin: 0 0 8px; }
+  .ejemplo-detalle .dato {
+    color: var(--accent2); font-family: "Courier New", monospace; font-size: .8rem;
+  }
+  .ejemplo-detalle .paso {
+    margin: 8px 0; padding-left: 12px; border-left: 3px solid var(--accent);
+  }
+  .ejemplo-detalle .resultado-final {
+    color: var(--ok); font-weight: 700;
+    background: rgba(34,197,94,.1);
+    padding: 8px 10px; border-radius: 8px; margin-top: 10px;
+  }
+
+  .nav-bottom {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    background: rgba(15,23,42,.95);
+    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    padding: 8px 6px; display: flex; justify-content: space-around;
+    border-top: 1px solid #334155; z-index: 100;
+  }
+  .nav-bottom button {
+    background: transparent; border: none; color: var(--muted);
+    font-size: .62rem; display: flex; flex-direction: column;
+    align-items: center; gap: 2px; cursor: pointer;
+    padding: 4px 6px; border-radius: 10px; flex: 1;
+  }
+  .nav-bottom button.active { color: var(--accent); }
+  .nav-bottom button .icon { font-size: 1.1rem; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>⚗️ GasLab Móvil v4.0</h1>
+  <p>Animación molecular realista de las leyes de los gases</p>
+</header>
+
+<div class="tabs" id="tabs"></div>
+<div id="content"></div>
+<div class="nav-bottom" id="navBottom"></div>
+
+<script>
+// ============================================================
+//  CONSTANTE
+// ============================================================
+const R = 0.0821;
+
+// ============================================================
+//  FORMATEO
+// ============================================================
+function formatearNumero(n) {
+  if (!isFinite(n)) return '—';
+  const redondeado = Math.round(n * 1000) / 1000;
+  return redondeado.toString();
+}
+
+// ============================================================
+//  UTILIDADES DE COLOR (temperatura)
+// ============================================================
+function colorPorTemperatura(T) {
+  // T va de 100 K a 1000 K
+  // Azul (frío) → Cian → Verde → Amarillo → Rojo (caliente)
+  const t = Math.max(0, Math.min((T - 100) / 900, 1));
+  let r, g, b;
+  if (t < 0.25) {
+    // azul → cian
+    const k = t / 0.25;
+    r = 100 + (56 - 100) * k;
+    g = 150 + (189 - 150) * k;
+    b = 255;
+  } else if (t < 0.5) {
+    // cian → verde
+    const k = (t - 0.25) / 0.25;
+    r = 56 + (34 - 56) * k;
+    g = 189 + (197 - 189) * k;
+    b = 255 + (94 - 255) * k;
+  } else if (t < 0.75) {
+    // verde → amarillo
+    const k = (t - 0.5) / 0.25;
+    r = 34 + (250 - 34) * k;
+    g = 197 + (204 - 197) * k;
+    b = 94 + (21 - 94) * k;
+  } else {
+    // amarillo → rojo
+    const k = (t - 0.75) / 0.25;
+    r = 250 + (239 - 250) * k;
+    g = 204 + (68 - 204) * k;
+    b = 21 + (68 - 21) * k;
+  }
+  return `rgb(${Math.round(r)}, ${Math.round(g)}, ${Math.round(b)})`;
+}
+
+// ============================================================
+//  DEFINICIÓN DE LAS 6 LEYES
+// ============================================================
+const leyes = [
+  // ==========================================================
+  // 1. LEY DE BOYLE
+  // ==========================================================
+  {
+    id: 'boyle',
+    nombre: 'Boyle',
+    titulo: 'Ley de Boyle-Mariotte',
+    formula: 'P₁·V₁ = P₂·V₂   (T, n constantes)',
+    desc: 'A temperatura constante, la presión de un gas es inversamente proporcional a su volumen. Al reducir el volumen, las moléculas chocan más contra las paredes y la presión sube.',
+    constantes: ['T', 'n'],
+    variables: [
+      { key: 'T',  label: 'Temperatura', min: 100, max: 800, step: 5,   value: 300, unit: 'K' },
+      { key: 'n',  label: 'Moles',       min: 0.1, max: 3,   step: 0.1, value: 1,   unit: 'mol' },
+      { key: 'V1', label: 'V₁ (inicial)',min: 0.5, max: 20,  step: 0.1, value: 5,   unit: 'L' },
+      { key: 'P1', label: 'P₁ (inicial)',min: 0.5, max: 10,  step: 0.1, value: 2,   unit: 'atm' },
+      { key: 'V2', label: 'V₂ (final)',  min: 0.5, max: 20,  step: 0.1, value: 10,  unit: 'L' },
+      { key: 'P2', label: 'P₂ (final)',  min: 0.5, max: 10,  step: 0.1, value: 1,   unit: 'atm' }
+    ],
+    resolver: (v, incog) => {
+      if (incog === 'V2') return (v.V1 * v.P1) / v.P2;
+      if (incog === 'V1') return (v.V2 * v.P2) / v.P1;
+      if (incog === 'P2') return (v.P1 * v.V1) / v.V2;
+      if (incog === 'P1') return (v.P2 * v.V2) / v.V1;
+      return 0;
+    },
+    grafica: (v) => {
+      const cte = v.P1 * v.V1;
+      const V = [], P = [];
+      for (let x = 0.5; x <= 20; x += 0.25) {
+        V.push(x.toFixed(2));
+        P.push(cte / x);
+      }
+      return {
+        labels: V, data: P, color: '#38bdf8',
+        xLabel: 'Volumen (L)', yLabel: 'Presión (atm)',
+        puntos: [
+          { x: v.V1, y: v.P1, color: '#facc15', label: 'Inicial' },
+          { x: v.V2, y: v.P2, color: '#22c55e', label: 'Final' }
+        ]
+      };
+    },
+    // ANIMACIÓN: T y n constantes → velocidad fija, N partículas fijo
+    // V cambia → ancho de cámara. Más presión → destellos de colisión
+    animar: (v) => ({
+      nParticulas: Math.max(10, Math.round(20 * v.n)),
+      volumenRel: Math.max(0.15, Math.min(v.V2 / 20, 1)),
+      temp: v.T,
+      presion: v.P2,
+      mostrarDestellos: true,
+      mostrarTermometro: false,
+      mostrarManometro: true,
+      mostrarMoles: true
+    })
+  },
+
+  // ==========================================================
+  // 2. LEY DE CHARLES
+  // ==========================================================
+  {
+    id: 'charles',
+    nombre: 'Charles',
+    titulo: 'Ley de Charles',
+    formula: 'V₁/T₁ = V₂/T₂   (P, n constantes)',
+    desc: 'A presión constante, el volumen es directamente proporcional a la temperatura absoluta. Al calentar, las moléculas se mueven más rápido y el gas se expande.',
+    constantes: ['P', 'n'],
+    variables: [
+      { key: 'P',  label: 'Presión',      min: 0.5, max: 5,    step: 0.1, value: 1,   unit: 'atm' },
+      { key: 'n',  label: 'Moles',        min: 0.1, max: 3,    step: 0.1, value: 1,   unit: 'mol' },
+      { key: 'V1', label: 'V₁ (inicial)', min: 0.5, max: 30,   step: 0.1, value: 5,   unit: 'L' },
+      { key: 'T1', label: 'T₁ (inicial)', min: 100, max: 1000, step: 5,   value: 300, unit: 'K' },
+      { key: 'V2', label: 'V₂ (final)',   min: 0.5, max: 30,   step: 0.1, value: 10,  unit: 'L' },
+      { key: 'T2', label: 'T₂ (final)',   min: 100, max: 1000, step: 5,   value: 600, unit: 'K' }
+    ],
+    resolver: (v, incog) => {
+      if (incog === 'V2') return (v.V1 * v.T2) / v.T1;
+      if (incog === 'V1') return (v.V2 * v.T1) / v.T2;
+      if (incog === 'T2') return (v.V2 * v.T1) / v.V1;
+      if (incog === 'T1') return (v.V1 * v.T2) / v.V2;
+      return 0;
+    },
+    grafica: (v) => {
+      const T = [], Vol = [];
+      const pendiente = v.V1 / v.T1;
+      for (let t = 100; t <= 1000; t += 10) {
+        T.push(t);
+        Vol.push(pendiente * t);
+      }
+      return {
+        labels: T, data: Vol, color: '#f472b6',
+        xLabel: 'Temperatura (K)', yLabel: 'Volumen (L)',
+        puntos: [
+          { x: v.T1, y: v.V1, color: '#facc15', label: 'Inicial' },
+          { x: v.T2, y: v.V2, color: '#22c55e', label: 'Final' }
+        ]
+      };
+    },
+    // ANIMACIÓN: P y n constantes → N partículas fijo
+    // T cambia → velocidad. V cambia → ancho de cámara
+    animar: (v) => ({
+      nParticulas: Math.max(10, Math.round(20 * v.n)),
+      volumenRel: Math.max(0.15, Math.min(v.V2 / 30, 1)),
+      temp: v.T2,
+      presion: v.P,
+      mostrarDestellos: false,
+      mostrarTermometro: true,
+      mostrarManometro: false,
+      mostrarMoles: true
+    })
+  },
+
+  // ==========================================================
+  // 3. LEY DE GAY-LUSSAC
+  // ==========================================================
+  {
+    id: 'gaylussac',
+    nombre: 'Gay-Lussac',
+    titulo: 'Ley de Gay-Lussac',
+    formula: 'P₁/T₁ = P₂/T₂   (V, n constantes)',
+    desc: 'A volumen constante, la presión es directamente proporcional a la temperatura absoluta. Al calentar en recipiente rígido, las moléculas chocan más fuerte y más seguido.',
+    constantes: ['V', 'n'],
+    variables: [
+      { key: 'V',  label: 'Volumen',      min: 0.5, max: 20,   step: 0.1, value: 5,   unit: 'L' },
+      { key: 'n',  label: 'Moles',        min: 0.1, max: 3,    step: 0.1, value: 1,   unit: 'mol' },
+      { key: 'P1', label: 'P₁ (inicial)', min: 0.5, max: 10,   step: 0.1, value: 1,   unit: 'atm' },
+      { key: 'T1', label: 'T₁ (inicial)', min: 100, max: 1000, step: 5,   value: 300, unit: 'K' },
+      { key: 'P2', label: 'P₂ (final)',   min: 0.5, max: 10,   step: 0.1, value: 2,   unit: 'atm' },
+      { key: 'T2', label: 'T₂ (final)',   min: 100, max: 1000, step: 5,   value: 600, unit: 'K' }
+    ],
+    resolver: (v, incog) => {
+      if (incog === 'P2') return (v.P1 * v.T2) / v.T1;
+      if (incog === 'P1') return (v.P2 * v.T1) / v.T2;
+      if (incog === 'T2') return (v.P2 * v.T1) / v.P1;
+      if (incog === 'T1') return (v.P1 * v.T2) / v.P2;
+      return 0;
+    },
+    grafica: (v) => {
+      const T = [], P = [];
+      const pendiente = v.P1 / v.T1;
+      for (let t = 100; t <= 1000; t += 10) {
+        T.push(t);
+        P.push(pendiente * t);
+      }
+      return {
+        labels: T, data: P, color: '#22c55e',
+        xLabel: 'Temperatura (K)', yLabel: 'Presión (atm)',
+        puntos: [
+          { x: v.T1, y: v.P1, color: '#facc15', label: 'Inicial' },
+          { x: v.T2, y: v.P2, color: '#22c55e', label: 'Final' }
+        ]
+      };
+    },
+    // ANIMACIÓN: V y n constantes → N partículas fijo, cámara fija
+    // T cambia → velocidad. Más T → más choques → más destellos
+    animar: (v) => ({
+      nParticulas: Math.max(10, Math.round(20 * v.n)),
+      volumenRel: Math.max(0.15, Math.min(v.V / 20, 1)),
+      temp: v.T2,
+      presion: v.P2,
+      mostrarDestellos: true,
+      mostrarTermometro: true,
+      mostrarManometro: true,
+      mostrarMoles: true
+    })
+  },
+
+  // ==========================================================
+  // 4. LEY DE AVOGADRO
+  // ==========================================================
+  {
+    id: 'avogadro',
+    nombre: 'Avogadro',
+    titulo: 'Ley de Avogadro',
+    formula: 'V₁/n₁ = V₂/n₂   (P, T constantes)',
+    desc: 'A presión y temperatura constantes, el volumen es directamente proporcional al número de moles. Más moléculas = más volumen.',
+    constantes: ['P', 'T'],
+    variables: [
+      { key: 'P',  label: 'Presión',       min: 0.5, max: 5,   step: 0.1, value: 1,   unit: 'atm' },
+      { key: 'T',  label: 'Temperatura',   min: 100, max: 1000,step: 5,   value: 300, unit: 'K' },
+      { key: 'V1', label: 'V₁ (inicial)',  min: 0.5, max: 30,  step: 0.1, value: 5,   unit: 'L' },
+      { key: 'n1', label: 'n₁ (inicial)',  min: 0.1, max: 5,   step: 0.1, value: 1,   unit: 'mol' },
+      { key: 'V2', label: 'V₂ (final)',    min: 0.5, max: 30,  step: 0.1, value: 15,  unit: 'L' },
+      { key: 'n2', label: 'n₂ (final)',    min: 0.1, max: 5,   step: 0.1, value: 3,   unit: 'mol' }
+    ],
+    resolver: (v, incog) => {
+      if (incog === 'V2') return (v.V1 * v.n2) / v.n1;
+      if (incog === 'V1') return (v.V2 * v.n1) / v.n2;
+      if (incog === 'n2') return (v.n1 * v.V2) / v.V1;
+      if (incog === 'n1') return (v.n2 * v.V1) / v.V2;
+      return 0;
+    },
+    grafica: (v) => {
+      const n = [], Vol = [];
+      const pendiente = v.V1 / v.n1;
+      for (let x = 0.1; x <= 5; x += 0.1) {
+        n.push(x.toFixed(1));
+        Vol.push(pendiente * x);
+      }
+      return {
+        labels: n, data: Vol, color: '#a78bfa',
+        xLabel: 'Moles (mol)', yLabel: 'Volumen (L)',
+        puntos: [
+          { x: v.n1.toFixed(1), y: v.V1, color: '#facc15', label: 'Inicial' },
+          { x: v.n2.toFixed(1), y: v.V2, color: '#22c55e', label: 'Final' }
+        ]
+      };
+    },
+    // ANIMACIÓN: P y T constantes → velocidad fija
+    // n cambia → N partículas. V cambia → ancho de cámara
+    animar: (v) => ({
+      nParticulas: Math.max(8, Math.round(15 * v.n2)),
+      volumenRel: Math.max(0.15, Math.min(v.V2 / 30, 1)),
+      temp: v.T,
+      presion: v.P,
+      mostrarDestellos: false,
+      mostrarTermometro: false,
+      mostrarManometro: false,
+      mostrarMoles: true
+    })
+  },
+
+  // ==========================================================
+  // 5. LEY COMBINADA
+  // ==========================================================
+  {
+    id: 'combinada',
+    nombre: 'Combinada',
+    titulo: 'Ley Combinada',
+    formula: '(P₁·V₁)/T₁ = (P₂·V₂)/T₂',
+    desc: 'Relaciona P, V y T cuando n es constante. La animación refleja los cambios combinados de las tres variables.',
+    constantes: ['n'],
+    variables: [
+      { key: 'P1', label: 'P₁ (inicial)', min: 0.5, max: 5,    step: 0.1, value: 1,   unit: 'atm' },
+      { key: 'V1', label: 'V₁ (inicial)', min: 0.5, max: 20,   step: 0.1, value: 5,   unit: 'L' },
+      { key: 'T1', label: 'T₁ (inicial)', min: 100, max: 1000, step: 5,   value: 300, unit: 'K' },
+      { key: 'P2', label: 'P₂ (final)',   min: 0.5, max: 5,    step: 0.1, value: 1.5, unit: 'atm' },
+      { key: 'V2', label: 'V₂ (final)',   min: 0.5, max: 20,   step: 0.1, value: 5,   unit: 'L' },
+      { key: 'T2', label: 'T₂ (final)',   min: 100, max: 1000, step: 5,   value: 400, unit: 'K' }
+    ],
+    resolver: (v, incog) => {
+      const K = (v.P1 * v.V1) / v.T1;
+      if (incog === 'P2') return (K * v.T2) / v.V2;
+      if (incog === 'V2') return (K * v.T2) / v.P2;
+      if (incog === 'T2') return (v.P2 * v.V2) / K;
+      if (incog === 'P1') return (v.P2 * v.V2 * v.T1) / (v.T2 * v.V1);
+      if (incog === 'V1') return (v.P2 * v.V2 * v.T1) / (v.T2 * v.P1);
+      if (incog === 'T1') return (v.P1 * v.V1 * v.T2) / (v.P2 * v.V2);
+      return 0;
+    },
+    grafica: (v) => {
+      const T = [], P = [];
+      const K = (v.P1 * v.V1) / v.T1;
+      for (let t = 100; t <= 1000; t += 10) {
+        T.push(t);
+        P.push((K * t) / v.V2);
+      }
+      return {
+        labels: T, data: P, color: '#fb923c',
+        xLabel: 'Temperatura (K)', yLabel: 'Presión (atm)',
+        puntos: [{ x: v.T2, y: v.P2, color: '#22c55e', label: 'Estado final' }]
+      };
+    },
+    animar: (v) => ({
+      nParticulas: 25,
+      volumenRel: Math.max(0.15, Math.min(v.V2 / 20, 1)),
+      temp: v.T2,
+      presion: v.P2,
+      mostrarDestellos: true,
+      mostrarTermometro: true,
+      mostrarManometro: true,
+      mostrarMoles: false
+    })
+  },
+
+  // ==========================================================
+  // 6. LEY DE LOS GASES IDEALES
+  // ==========================================================
+  {
+    id: 'ideal',
+    nombre: 'Gas Ideal',
+    titulo: 'Ley de los Gases Ideales',
+    formula: 'P·V = n·R·T',
+    desc: 'Ecuación fundamental. Ninguna variable es constante. La animación refleja los 4 parámetros simultáneamente.',
+    constantes: [],
+    variables: [
+      { key: 'P', label: 'Presión',     min: 0.1, max: 10,  step: 0.1, value: 1,   unit: 'atm' },
+      { key: 'V', label: 'Volumen',     min: 0.5, max: 30,  step: 0.1, value: 22.4,unit: 'L' },
+      { key: 'n', label: 'Moles',       min: 0.1, max: 5,   step: 0.1, value: 1,   unit: 'mol' },
+      { key: 'T', label: 'Temperatura', min: 100, max: 1000,step: 5,   value: 273, unit: 'K' }
+    ],
+    resolver: (v, incog) => {
+      if (incog === 'P') return (v.n * R * v.T) / v.V;
+      if (incog === 'V') return (v.n * R * v.T) / v.P;
+      if (incog === 'n') return (v.P * v.V) / (R * v.T);
+      if (incog === 'T') return (v.P * v.V) / (v.n * R);
+      return 0;
+    },
+    grafica: (v) => {
+      const V = [], T = [];
+      for (let x = 0.5; x <= 30; x += 0.5) {
+        V.push(x.toFixed(1));
+        T.push((v.P * x) / (v.n * R));
+      }
+      return {
+        labels: V, data: T, color: '#06b6d4',
+        xLabel: 'Volumen (L)', yLabel: 'Temperatura (K)',
+        puntos: [{ x: v.V.toFixed(1), y: v.T, color: '#facc15', label: 'Estado actual' }]
+      };
+    },
+    animar: (v) => ({
+      nParticulas: Math.max(8, Math.round(15 * v.n)),
+      volumenRel: Math.max(0.15, Math.min(v.V / 30, 1)),
+      temp: v.T,
+      presion: v.P,
+      mostrarDestellos: true,
+      mostrarTermometro: true,
+      mostrarManometro: true,
+      mostrarMoles: true
+    })
+  }
+];
+
+// ============================================================
+//  ESTADO GLOBAL
+// ============================================================
+let leyActual = leyes[0];
+let incogActual = 'V2';
+let estado = {};
+let modoLaboratorio = false;
+let chart = null;
+let molCanvas, molCtx;
+let particulas = [];
+let destellos = [];
+let animFrame = null;
+let anchoUtilActual = 0;
+let nParticulasActual = 0;
+
+function initEstado(ley) {
+  estado = {};
+  ley.variables.forEach(v => estado[v.key] = v.value);
+  incogActual = ley.variables[ley.variables.length - 1].key;
+  modoLaboratorio = false;
+}
+
+// ============================================================
+//  TABS + NAV
+// ============================================================
+function renderTabs() {
+  const tabs = document.getElementById('tabs');
+  tabs.innerHTML = leyes.map(l =>
+    `<button class="tab ${l.id === leyActual.id ? 'active' : ''}" data-id="${l.id}">${l.nombre}</button>`
+  ).join('');
+  tabs.querySelectorAll('.tab').forEach(btn => {
+    btn.onclick = () => {
+      leyActual = leyes.find(l => l.id === btn.dataset.id);
+      initEstado(leyActual);
+      renderTabs();
+      renderContenido();
+      renderNavBottom();
+    };
+  });
+}
+
+function renderNavBottom() {
+  const nav = document.getElementById('navBottom');
+  const iconos = { boyle: '🔵', charles: '🟣', gaylussac: '🟢',
+                   avogadro: '🟪', combinada: '🟠', ideal: '🔷' };
+  nav.innerHTML = leyes.map(l => `
+    <button data-id="${l.id}" class="${l.id === leyActual.id ? 'active' : ''}">
+      <span class="icon">${iconos[l.id]}</span>
+      <span>${l.nombre}</span>
+    </button>
+  `).join('');
+  nav.querySelectorAll('button').forEach(btn => {
+    btn.onclick = () => {
+      leyActual = leyes.find(l => l.id === btn.dataset.id);
+      initEstado(leyActual);
+      renderTabs();
+      renderContenido();
+      renderNavBottom();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+  });
+}
+
+// ============================================================
+//  RENDER PRINCIPAL
+// ============================================================
+function renderContenido() {
+  const c = document.getElementById('content');
+  const ley = leyActual;
+
+  const variablesDisponibles = ley.variables.filter(v =>
+    !ley.constantes.includes(v.key)
+  );
+
+  const selectorHTML = variablesDisponibles.map(v =>
+    `<button class="${v.key === incogActual ? 'active' : ''}" data-inc="${v.key}">${v.key}</button>`
+  ).join('');
+
+  const slidersHTML = ley.variables.map(v => {
+    const esIncog = (v.key === incogActual);
+    const esConstante = ley.constantes.includes(v.key);
+    const bloqueada = esConstante && !modoLaboratorio;
+
+    let clase = 'field';
+    if (esIncog) clase += ' incognita';
+    else if (bloqueada) clase += ' bloqueada';
+
+    let icono = '';
+    let labelExtra = '';
+    if (esIncog) { icono = '❓'; labelExtra = ' (incógnita)'; }
+    else if (bloqueada) { icono = '🔒'; labelExtra = ' (constante)'; }
+    else if (esConstante && modoLaboratorio) { icono = '🔓'; labelExtra = ' (desbloqueada)'; }
+
+    const valorMostrar = esIncog ? '❓' : formatearNumero(estado[v.key]) + ' ' + v.unit;
+
+    return `
+      <div class="${clase}">
+        <label>
+          <span>${icono} ${v.label}${labelExtra}</span>
+          <span class="value" id="val-${v.key}">${valorMostrar}</span>
+        </label>
+        <input type="range" id="slider-${v.key}"
+          min="${v.min}" max="${v.max}" step="${v.step}"
+          value="${estado[v.key]}"
+          ${esIncog || bloqueada ? 'disabled' : ''}>
+      </div>`;
+  }).join('');
+
+  const avisoLab = modoLaboratorio
+    ? `<div class="aviso-lab">⚠️ <strong>Modo laboratorio activo.</strong>
+        Las constantes están desbloqueadas. Los resultados ya no representan
+        la ${ley.titulo} pura.</div>`
+    : '';
+
+  const switchClass = modoLaboratorio ? 'switch on' : 'switch';
+
+  let valorIncog = 0;
+  try { valorIncog = ley.resolver(estado, incogActual); } catch(e) { valorIncog = 0; }
+  if (!isFinite(valorIncog)) valorIncog = 0;
+  const varIncog = ley.variables.find(v => v.key === incogActual);
+
+  const constantesInfo = ley.constantes.length > 0
+    ? `<div class="info" style="margin-top:6px">🔒 <strong>Constantes:</strong> ${ley.constantes.join(', ')}.</div>`
+    : `<div class="info" style="margin-top:6px">✅ <strong>Sin constantes:</strong> todas las variables son libres.</div>`;
+
+  c.innerHTML = `
+    <div class="card">
+      <h2>${ley.titulo}</h2>
+      <div class="formula">${ley.formula}</div>
+
+      <div class="modo-lab">
+        <span class="label">🔓 Modo laboratorio</span>
+        <div class="${switchClass}" id="switchLab"></div>
+      </div>
+
+      ${avisoLab}
+
+      <div class="info" style="margin-bottom:8px">
+        <strong>🎯 ¿Qué variable quieres calcular?</strong>
+      </div>
+      <div class="selector" id="selectorIncog">${selectorHTML}</div>
+
+      ${slidersHTML}
+
+      <div class="result">
+        <div class="label">${varIncog.label} (incógnita)</div>
+        <div class="value" id="resultadoValor">${formatearNumero(valorIncog)}</div>
+        <div class="unit">${varIncog.unit}</div>
+      </div>
+
+      <div class="info">${ley.desc}</div>
+      ${constantesInfo}
+    </div>
+
+    <div class="card">
+      <h2>🔬 Animación molecular <span class="badge">realista</span></h2>
+      <div class="mol-wrap">
+        <canvas class="mol" id="molCanvas"></canvas>
+        <div class="mol-overlay" id="molOverlay"></div>
+      </div>
+      <div class="info" id="molInfo"></div>
+    </div>
+
+    <div class="card">
+      <h2>📈 Gráfica dinámica</h2>
+      <div class="chart-wrap"><canvas id="grafica"></canvas></div>
+    </div>
+
+    <div class="card">
+      <h2>💡 Ejemplos resueltos paso a paso</h2>
+      <div class="ejemplos" id="ejemplosBox"></div>
+      <div class="ejemplo-detalle" id="ejemploDetalle">
+        <div class="info">Toca un ejemplo para ver el planteamiento, el cálculo y la interpretación.</div>
+      </div>
+    </div>
+  `;
+
+  document.getElementById('switchLab').onclick = () => {
+    modoLaboratorio = !modoLaboratorio;
+    renderContenido();
+  };
+
+  document.querySelectorAll('#selectorIncog button').forEach(btn => {
+    btn.onclick = () => {
+      incogActual = btn.dataset.inc;
+      renderContenido();
+    };
+  });
+
+  ley.variables.forEach(v => {
+    const input = document.getElementById(`slider-${v.key}`);
+    if (!input || input.disabled) return;
+    input.oninput = (e) => {
+      estado[v.key] = parseFloat(e.target.value);
+      const el = document.getElementById(`val-${v.key}`);
+      if (el) el.textContent = `${formatearNumero(estado[v.key])} ${v.unit}`;
+      actualizarResultado();
+      actualizarGrafica();
+    };
+  });
+
+  molCanvas = document.getElementById('molCanvas');
+  molCtx = molCanvas.getContext('2d');
+  resizeMolCanvas();
+  initParticulas();
+  if (animFrame) cancelAnimationFrame(animFrame);
+  animLoop();
+
+  dibujarGrafica();
+  renderEjemplos();
+  actualizarInfoAnimacion();
+}
+
+function actualizarInfoAnimacion() {
+  const info = document.getElementById('molInfo');
+  if (!info) return;
+  const ley = leyActual;
+  let texto = '';
+  if (ley.id === 'boyle') {
+    texto = '🔵 <strong>T y n fijos</strong> → misma velocidad. Al reducir V, las partículas chocan más contra las paredes (💥 destellos) y P sube.';
+  } else if (ley.id === 'charles') {
+    texto = '🟣 <strong>P y n fijos</strong> → V libre. Al subir T, las partículas se mueven más rápido (colores cálidos) y la cámara se expande.';
+  } else if (ley.id === 'gaylussac') {
+    texto = '🟢 <strong>V y n fijos</strong> → cámara fija. Al subir T, las partículas van más rápido y chocan más fuerte (💥 más destellos).';
+  } else if (ley.id === 'avogadro') {
+    texto = '🟪 <strong>P y T fijos</strong> → velocidad constante. Al subir n, se dibujan MÁS partículas y el volumen crece proporcionalmente.';
+  } else if (ley.id === 'combinada') {
+    texto = '🟠 <strong>n constante</strong>. P, V y T se ajustan simultáneamente: la animación refleja los cambios combinados.';
+  } else {
+    texto = '🔷 <strong>Las 4 variables son libres</strong>. La animación responde a P, V, n y T al mismo tiempo.';
+  }
+  info.innerHTML = texto;
+}
+
+// ============================================================
+//  ACTUALIZAR RESULTADO
+// ============================================================
+function actualizarResultado() {
+  let valor = 0;
+  try { valor = leyActual.resolver(estado, incogActual); } catch(e) { valor = 0; }
+  if (!isFinite(valor)) valor = 0;
+  const el = document.getElementById('resultadoValor');
+  if (el) el.textContent = formatearNumero(valor);
+}
+
+// ============================================================
+//  GRÁFICA
+// ============================================================
+function dibujarGrafica() {
+  const canvas = document.getElementById('grafica');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+
+  let valor = 0;
+  try { valor = leyActual.resolver(estado, incogActual); } catch(e) {}
+  if (!isFinite(valor)) valor = 0;
+
+  const data = leyActual.grafica(estado, incogActual, valor);
+
+  const datasets = [{
+    label: 'Curva característica',
+    data: data.data,
+    borderColor: data.color,
+    backgroundColor: data.color + '22',
+    fill: true, tension: 0.3, pointRadius: 0
+  }];
+
+  if (data.puntos) {
+    data.puntos.forEach(p => {
+      if (!isFinite(p.y)) return;
+      datasets.push({
+        label: p.label,
+        data: [p.y],
+        borderColor: p.color,
+        backgroundColor: p.color,
+        pointRadius: 7, pointHoverRadius: 9, showLine: false
+      });
+    });
+  }
+
+  if (chart) chart.destroy();
+
+  chart = new Chart(ctx, {
+    type: 'line',
+    data: { labels: data.labels, datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { labels: { color: '#e2e8f0', font: { size: 10 }, boxWidth: 12 } },
+        tooltip: { mode: 'index', intersect: false }
+      },
+      scales: {
+        x: {
+          ticks: { color: '#94a3b8', maxTicksLimit: 5, font: { size: 9 } },
+          grid: { color: 'rgba(148,163,184,0.08)' },
+          title: { display: true, text: data.xLabel, color: '#94a3b8', font: { size: 10 } }
+        },
+        y: {
+          ticks: { color: '#94a3b8', maxTicksLimit: 5, font: { size: 9 } },
+          grid: { color: 'rgba(148,163,184,0.08)' },
+          title: { display: true, text: data.yLabel, color: '#94a3b8', font: { size: 10 } }
+        }
+      },
+      animation: { duration: 250 }
+    }
+  });
+}
+
+function actualizarGrafica() {
+  if (!chart) return;
+  let valor = 0;
+  try { valor = leyActual.resolver(estado, incogActual); } catch(e) {}
+  if (!isFinite(valor)) valor = 0;
+  const data = leyActual.grafica(estado, incogActual, valor);
+
+  chart.data.labels = data.labels;
+  chart.data.datasets[0].data = data.data;
+  if (data.puntos) {
+    let idx = 1;
+    data.puntos.forEach(p => {
+      if (!isFinite(p.y)) return;
+      if (chart.data.datasets[idx]) chart.data.datasets[idx].data = [p.y];
+      idx++;
+    });
+  }
+  chart.update('none');
+}
+
+// ============================================================
+//  ANIMACIÓN MOLECULAR AVANZADA
+// ============================================================
+
+function resizeMolCanvas() {
+  if (!molCanvas) return;
+  const rect = molCanvas.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+  molCanvas.width = rect.width * dpr;
+  molCanvas.height = 240 * dpr;
+  molCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+
+function initParticulas() {
+  // Se reinicializa cuando cambia el número
+  let params = { nParticulas: 20 };
+  try { if (leyActual.animar) params = leyActual.animar(estado); } catch(e) {}
+  const n = params.nParticulas || 20;
+  if (particulas.length === n && nParticulasActual === n) return;
+
+  nParticulasActual = n;
+  particulas = [];
+  for (let i = 0; i < n; i++) {
+    // Ángulo aleatorio para la dirección
+    const angulo = Math.random() * Math.PI * 2;
+    particulas.push({
+      x: Math.random(),
+      y: Math.random(),
+      vx: Math.cos(angulo),
+      vy: Math.sin(angulo),
+      r: 2 + Math.random() * 1.5,
+      fase: Math.random() * Math.PI * 2 // para pulso de colisión
+    });
+  }
+}
+
+function animLoop() {
+  if (!molCtx || !molCanvas) return;
+
+  const dpr = window.devicePixelRatio || 1;
+  const w = molCanvas.width / dpr;
+  const h = molCanvas.height / dpr;
+
+  molCtx.clearRect(0, 0, w, h);
+
+  // Obtener parámetros de la ley actual
+  let params = { volumenRel: 0.5, temp: 300, presion: 1, mostrarDestellos: false,
+                 mostrarTermometro: false, mostrarManometro: false, mostrarMoles: false };
+  try { if (leyActual.animar) params = leyActual.animar(estado); } catch(e) {}
+
+  // Reinicializar partículas si cambió el número
+  if (particulas.length !== (params.nParticulas || 20)) {
+    initParticulas();
+  }
+
+  // Suavizado del ancho de la cámara (transición suave)
+  const anchoObjetivo = w * (0.15 + 0.8 * (params.volumenRel || 0.5));
+  if (anchoUtilActual === 0) anchoUtilActual = anchoObjetivo;
+  anchoUtilActual += (anchoObjetivo - anchoUtilActual) * 0.15;
+  const anchoUtil = anchoUtilActual;
+
+  // === FONDO DE LA CÁMARA (gradiente según temperatura) ===
+  const colorT = colorPorTemperatura(params.temp || 300);
+  const gradCamara = molCtx.createLinearGradient(0, 0, anchoUtil, h);
+  gradCamara.addColorStop(0, 'rgba(15,23,42,0.9)');
+  gradCamara.addColorStop(1, 'rgba(15,23,42,0.6)');
+  molCtx.fillStyle = gradCamara;
+  molCtx.fillRect(0, 0, anchoUtil, h);
+
+  // === BORDE DE LA CÁMARA ===
+  molCtx.strokeStyle = colorT;
+  molCtx.lineWidth = 2;
+  molCtx.strokeRect(1, 1, anchoUtil - 2, h - 2);
+
+  // === PISTÓN ===
+  const pistonX = anchoUtil;
+  molCtx.fillStyle = '#475569';
+  molCtx.fillRect(pistonX, 0, 10, h);
+  molCtx.fillStyle = '#64748b';
+  molCtx.fillRect(pistonX + 10, h / 2 - 20, 8, 40);
+  // Rayas del pistón
+  molCtx.strokeStyle = '#334155';
+  molCtx.lineWidth = 1;
+  for (let y = 10; y < h; y += 15) {
+    molCtx.beginPath();
+    molCtx.moveTo(pistonX, y);
+    molCtx.lineTo(pistonX + 10, y);
+    molCtx.stroke();
+  }
+
+  // === VELOCIDAD (∝ √T, teoría cinética) ===
+  const temp = params.temp || 300;
+  const velocidadBase = Math.sqrt(temp / 300) * 1.2;
+
+  // === ACTUALIZAR Y DIBUJAR PARTÍCULAS ===
+  const colorPart = colorT;
+  const radioBase = 2 + Math.min((params.presion || 1) * 0.3, 1.5);
+
+  particulas.forEach(p => {
+    // Movimiento
+    p.x += p.vx * velocidadBase * 0.004;
+    p.y += p.vy * velocidadBase * 0.004;
+
+    // Colisiones con paredes → destello si está activado
+    let colision = false;
+    if (p.x < 0.02) {
+      p.x = 0.02; p.vx = Math.abs(p.vx); colision = true;
+    }
+    if (p.x > 0.98) {
+      p.x = 0.98; p.vx = -Math.abs(p.vx); colision = true;
+    }
+    if (p.y < 0.02) {
+      p.y = 0.02; p.vy = Math.abs(p.vy); colision = true;
+    }
+    if (p.y > 0.98) {
+      p.y = 0.98; p.vy = -Math.abs(p.vy); colision = true;
+    }
+
+    if (colision && params.mostrarDestellos) {
+      destellos.push({
+        x: p.x * anchoUtil,
+        y: p.y * h,
+        vida: 1,
+        color: '#fbbf24'
+      });
+      // Limitar número de destellos
+      if (destellos.length > 30) destellos.shift();
+    }
+
+    // Posición en píxeles
+    const px = p.x * anchoUtil;
+    const py = p.y * h;
+
+    // Glow exterior
+    const glow = molCtx.createRadialGradient(px, py, 0, px, py, p.r * 4);
+    glow.addColorStop(0, colorPart);
+    glow.addColorStop(0.4, colorPart.replace('rgb', 'rgba').replace(')', ', 0.5)'));
+    glow.addColorStop(1, 'rgba(0,0,0,0)');
+    molCtx.fillStyle = glow;
+    molCtx.beginPath();
+    molCtx.arc(px, py, p.r * 4, 0, Math.PI * 2);
+    molCtx.fill();
+
+    // Núcleo
+    molCtx.fillStyle = '#ffffff';
+    molCtx.beginPath();
+    molCtx.arc(px, py, p.r * 0.6, 0, Math.PI * 2);
+    molCtx.fill();
+
+    // Anillo exterior
+    molCtx.strokeStyle = colorPart;
+    molCtx.lineWidth = 1.5;
+    molCtx.beginPath();
+    molCtx.arc(px, py, p.r, 0, Math.PI * 2);
+    molCtx.stroke();
+  });
+
+  // === DESTELLOS DE COLISIÓN ===
+  destellos = destellos.filter(d => d.vida > 0);
+  destellos.forEach(d => {
+    const radio = 4 + (1 - d.vida) * 20;
+    molCtx.strokeStyle = `rgba(251, 191, 36, ${d.vida})`;
+    molCtx.lineWidth = 2;
+    molCtx.beginPath();
+    molCtx.arc(d.x, d.y, radio, 0, Math.PI * 2);
+    molCtx.stroke();
+    d.vida -= 0.06;
+  });
+
+  // === TERMÓMETRO (opcional) ===
+  if (params.mostrarTermometro) {
+    const termX = anchoUtil + 25;
+    const termY = 20;
+    const termH = h - 40;
+    const termW = 8;
+
+    // Fondo del termómetro
+    molCtx.fillStyle = '#334155';
+    molCtx.fillRect(termX, termY, termW, termH);
+
+    // Nivel según temperatura
+    const nivel = Math.max(0, Math.min((temp - 100) / 900, 1));
+    const alturaNivel = termH * nivel;
+    const gradTerm = molCtx.createLinearGradient(0, termY + termH, 0, termY);
+    gradTerm.addColorStop(0, '#3b82f6');
+    gradTerm.addColorStop(0.5, '#22c55e');
+    gradTerm.addColorStop(1, '#ef4444');
+    molCtx.fillStyle = gradTerm;
+    molCtx.fillRect(termX, termY + termH - alturaNivel, termW, alturaNivel);
+
+    // Bulbo
+    molCtx.fillStyle = '#ef4444';
+    molCtx.beginPath();
+    molCtx.arc(termX + termW / 2, termY + termH + 6, 7, 0, Math.PI * 2);
+    molCtx.fill();
+
+    // Borde
+    molCtx.strokeStyle = '#64748b';
+    molCtx.lineWidth = 1;
+    molCtx.strokeRect(termX, termY, termW, termH);
+  }
+
+  // === MANÓMETRO (opcional) ===
+  if (params.mostrarManometro) {
+    const manX = 20;
+    const manY = h - 50;
+    const manR = 20;
+
+    // Círculo de fondo
+    molCtx.fillStyle = '#1e293b';
+    molCtx.beginPath();
+    molCtx.arc(manX, manY, manR, 0, Math.PI * 2);
+    molCtx.fill();
+    molCtx.strokeStyle = '#64748b';
+    molCtx.lineWidth = 2;
+    molCtx.stroke();
+
+    // Aguja según presión (escala 0-10 atm → -135° a +135°)
+    const presion = params.presion || 1;
+    const angulo = (-135 + (Math.min(presion, 10) / 10) * 270) * Math.PI / 180;
+    const agujaX = manX + Math.cos(angulo) * (manR - 5);
+    const agujaY = manY + Math.sin(angulo) * (manR - 5);
+
+    molCtx.strokeStyle = '#ef4444';
+    molCtx.lineWidth = 2;
+    molCtx.beginPath();
+    molCtx.moveTo(manX, manY);
+    molCtx.lineTo(agujaX, agujaY);
+    molCtx.stroke();
+
+    // Centro
+    molCtx.fillStyle = '#e2e8f0';
+    molCtx.beginPath();
+    molCtx.arc(manX, manY, 3, 0, Math.PI * 2);
+    molCtx.fill();
+
+    // Etiqueta P
+    molCtx.fillStyle = '#94a3b8';
+    molCtx.font = 'bold 9px sans-serif';
+    molCtx.textAlign = 'center';
+    molCtx.fillText('P', manX, manY + manR + 12);
+    molCtx.textAlign = 'left';
+  }
+
+  animFrame = requestAnimationFrame(animLoop);
+}
+
+// ============================================================
+//  EJEMPLOS
+// ============================================================
+const ejemplos = {
+  boyle: [
+    { n: '🤿 Buceo a 10 m', vals: { T: 300, n: 1, V1: 6, P1: 1, V2: 3, P2: 2 }, incog: 'P2',
+      contexto: 'Un buzo lleva una burbuja de 6 L en superficie (1 atm). A 10 m de profundidad, la presión se duplica a 2 atm y la burbuja se comprime.',
+      datos: 'V₁ = 6 L, P₁ = 1 atm, V₂ = 3 L',
+      formula: 'P₂ = (P₁·V₁)/V₂',
+      calculo: 'P₂ = (1 atm · 6 L) / 3 L = 2 atm',
+      interpretacion: 'Al reducirse el volumen a la mitad, la presión se duplica.' },
+    { n: '🎈 Globo comprimido', vals: { T: 300, n: 1, V1: 2, P1: 1, V2: 1, P2: 2 }, incog: 'P2',
+      contexto: 'Un globo de 2 L a 1 atm se comprime hasta 1 L.',
+      datos: 'V₁ = 2 L, P₁ = 1 atm, V₂ = 1 L',
+      formula: 'P₂ = (P₁·V₁)/V₂',
+      calculo: 'P₂ = (1·2)/1 = 2 atm',
+      interpretacion: 'Al reducir el volumen a la mitad, la presión se duplica.' },
+    { n: '🫁 Respiración', vals: { T: 310, n: 1, V1: 3, P1: 1, V2: 3.5, P2: 0.857 }, incog: 'P2',
+      contexto: 'Al inspirar, el diafragma baja y V pasa de 3 L a 3.5 L.',
+      datos: 'V₁ = 3 L, P₁ = 1 atm, V₂ = 3.5 L',
+      formula: 'P₂ = (P₁·V₁)/V₂',
+      calculo: 'P₂ = (1·3)/3.5 ≈ 0.857 atm',
+      interpretacion: 'Al aumentar V, P baja y el aire entra. ¡Así respiramos!' }
+  ],
+  charles: [
+    { n: '🎈 Globo caliente', vals: { P: 1, n: 1, V1: 5, T1: 300, V2: 10, T2: 600 }, incog: 'V2',
+      contexto: 'Un globo con 5 L a 300 K se calienta a 600 K.',
+      datos: 'V₁ = 5 L, T₁ = 300 K, T₂ = 600 K',
+      formula: 'V₂ = (V₁·T₂)/T₁',
+      calculo: 'V₂ = (5·600)/300 = 10 L',
+      interpretacion: 'Al duplicar T (en K), el volumen se duplica.' },
+    { n: '🚗 Neumático frío', vals: { P: 1, n: 1, V1: 10, T1: 300, V2: 8, T2: 240 }, incog: 'V2',
+      contexto: 'Un neumático con 10 L a 300 K se enfría a 240 K.',
+      datos: 'V₁ = 10 L, T₁ = 300 K, T₂ = 240 K',
+      formula: 'V₂ = (V₁·T₂)/T₁',
+      calculo: 'V₂ = (10·240)/300 = 8 L',
+      interpretacion: 'Al bajar T, el volumen disminuye.' }
+  ],
+  gaylussac: [
+    { n: '🍲 Olla a presión', vals: { V: 5, n: 1, P1: 1, T1: 300, P2: 1.5, T2: 450 }, incog: 'P2',
+      contexto: 'Vapor de agua a 1 atm y 300 K se calienta a 450 K en recipiente rígido.',
+      datos: 'P₁ = 1 atm, T₁ = 300 K, T₂ = 450 K',
+      formula: 'P₂ = (P₁·T₂)/T₁',
+      calculo: 'P₂ = (1·450)/300 = 1.5 atm',
+      interpretacion: 'Al subir T, la P sube. Por eso la olla cocina más rápido.' },
+    { n: '🚗 Llanta caliente', vals: { V: 10, n: 1, P1: 2, T1: 300, P2: 2.33, T2: 350 }, incog: 'P2',
+      contexto: 'Llanta con 2 atm a 300 K se calienta a 350 K en carretera.',
+      datos: 'P₁ = 2 atm, T₁ = 300 K, T₂ = 350 K',
+      formula: 'P₂ = (P₁·T₂)/T₁',
+      calculo: 'P₂ = (2·350)/300 ≈ 2.33 atm',
+      interpretacion: 'El calor por fricción eleva la presión.' }
+  ],
+  avogadro: [
+    { n: '🎈 Inflar globo', vals: { P: 1, T: 300, V1: 5, n1: 1, V2: 15, n2: 3 }, incog: 'V2',
+      contexto: 'Un globo con 1 mol ocupa 5 L. Se le inyecta aire hasta 3 moles.',
+      datos: 'V₁ = 5 L, n₁ = 1 mol, n₂ = 3 mol',
+      formula: 'V₂ = (V₁·n₂)/n₁',
+      calculo: 'V₂ = (5·3)/1 = 15 L',
+      interpretacion: 'Al triplicar n, V se triplica.' },
+    { n: '🫁 Respirar', vals: { P: 1, T: 310, V1: 5, n1: 0.5, V2: 8, n2: 0.8 }, incog: 'V2',
+      contexto: 'Pulmones con 0.5 mol → 5 L. Al inhalar, 0.8 mol.',
+      datos: 'V₁ = 5 L, n₁ = 0.5 mol, n₂ = 0.8 mol',
+      formula: 'V₂ = (V₁·n₂)/n₁',
+      calculo: 'V₂ = (5·0.8)/0.5 = 8 L',
+      interpretacion: 'Más moles de aire → más volumen pulmonar.' }
+  ],
+  combinada: [
+    { n: '🌡️ Globo + frío', vals: { P1: 1, V1: 5, T1: 300, P2: 1, V2: 4, T2: 240 }, incog: 'V2',
+      contexto: 'Globo con 5 L a 300 K se enfría a 240 K a presión constante.',
+      datos: 'P₁ = 1 atm, V₁ = 5 L, T₁ = 300 K, T₂ = 240 K',
+      formula: 'V₂ = (P₁·V₁·T₂)/(T₁·P₂)',
+      calculo: 'V₂ = (1·5·240)/(300·1) = 4 L',
+      interpretacion: 'Al bajar T, el globo se contrae.' },
+    { n: '⛰️ Subir montaña', vals: { P1: 1, V1: 5, T1: 300, P2: 0.8, V2: 6, T2: 288 }, incog: 'V2',
+      contexto: 'Excursionista con 5 L a 1 atm sube a 3000 m (0.8 atm, 288 K).',
+      datos: 'P₁ = 1 atm, V₁ = 5 L, T₁ = 300 K, P₂ = 0.8 atm, T₂ = 288 K',
+      formula: 'V₂ = (P₁·V₁·T₂)/(T₁·P₂)',
+      calculo: 'V₂ = (1·5·288)/(300·0.8) = 6 L',
+      interpretacion: 'Aunque baja T, la caída de P domina y V aumenta.' }
+  ],
+  ideal: [
+    { n: '🧪 CNPT', vals: { P: 1, V: 22.4, n: 1, T: 273 }, incog: 'T',
+      contexto: 'En CNPT, 1 mol de gas ideal ocupa 22.4 L a 1 atm.',
+      datos: 'P = 1 atm, V = 22.4 L, n = 1 mol',
+      formula: 'T = (P·V)/(n·R)',
+      calculo: 'T = (1·22.4)/(1·0.0821) ≈ 273 K',
+      interpretacion: '273 K = 0 °C. Es el volumen molar estándar.' },
+    { n: '🔥 Gas caliente', vals: { P: 1, V: 30, n: 1, T: 365 }, incog: 'T',
+      contexto: '1 mol de gas a 1 atm ocupa 30 L.',
+      datos: 'P = 1 atm, V = 30 L, n = 1 mol',
+      formula: 'T = (P·V)/(n·R)',
+      calculo: 'T = (1·30)/(1·0.0821) ≈ 365 K',
+      interpretacion: 'A P constante, más V implica mayor T.' }
+  ]
+};
+
+function renderEjemplos() {
+  const box = document.getElementById('ejemplosBox');
+  const lista = ejemplos[leyActual.id] || [];
+  box.innerHTML = lista.map((e, i) =>
+    `<button data-idx="${i}">${e.n}</button>`
+  ).join('');
+  box.querySelectorAll('button').forEach(btn => {
+    btn.onclick = () => {
+      box.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const e = lista[parseInt(btn.dataset.idx)];
+      Object.assign(estado, e.vals);
+      if (e.incog) incogActual = e.incog;
+      modoLaboratorio = false;
+      renderContenido();
+      setTimeout(() => {
+        const btns = document.querySelectorAll('#ejemplosBox button');
+        if (btns[parseInt(btn.dataset.idx)]) {
+          btns[parseInt(btn.dataset.idx)].classList.add('active');
+        }
+      }, 50);
+      document.getElementById('ejemploDetalle').innerHTML = `
+        <h3>${e.n}</h3>
+        <p><strong>📖 Contexto:</strong> ${e.contexto}</p>
+        <p><strong>📊 Datos:</strong> <span class="dato">${e.datos}</span></p>
+        <p><strong>🧮 Fórmula:</strong> <span class="dato">${e.formula}</span></p>
+        <div class="paso">
+          <strong>✏️ Cálculo:</strong> <span class="dato">${e.calculo}</span>
+        </div>
+        <div class="resultado-final">✅ ${e.interpretacion}</div>
+      `;
+    };
+  });
+}
+
+// ============================================================
+//  INICIO
+// ============================================================
+window.addEventListener('load', () => {
+  initEstado(leyActual);
+  renderTabs();
+  renderContenido();
+  renderNavBottom();
+});
+
+window.addEventListener('resize', () => { resizeMolCanvas(); });
+</script>
+</body>
+</html>
